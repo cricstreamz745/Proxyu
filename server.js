@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Custom logger to reduce noise
+// Custom logger
 const simpleLogger = (req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
@@ -22,31 +22,26 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'US Proxy Server is running' });
 });
 
-// IP verification endpoint (for testing)
+// IP verification endpoint (updated without external proxy)
 app.get('/ip-check', async (req, res) => {
   try {
-    const response = await axios.get('https://ipv4.webshare.io/', {
-      proxy: {
-        host: '23.95.150.145',
-        port: 6114,
-        protocol: 'http'
-      },
-      timeout: 10000
-    });
+    // Direct IP check without external proxy (since proxy requires auth)
+    const response = await axios.get('https://api.ipify.org?format=json');
     res.json({ 
-      ip: response.data.trim(),
-      message: 'External proxy connection successful'
+      ip: response.data.ip,
+      message: 'Server IP address',
+      note: 'External proxy requires authentication'
     });
   } catch (error) {
     console.error('IP check error:', error.message);
     res.status(500).json({ 
-      error: 'Proxy connection failed',
+      error: 'IP check failed',
       details: error.message 
     });
   }
 });
 
-// Configure proxy middleware with better error handling
+// Configure proxy middleware (direct to target without external proxy)
 const proxyOptions = {
   target: 'https://laaaaaaaal.dupereasy.com',
   changeOrigin: true,
@@ -54,9 +49,9 @@ const proxyOptions = {
     '^/proxy': '/slh/Y29NR1RBV1JTSGc2RGwxN0dZTUdjL1VxdnYwWUVaNjAxME0vRWtCU1E5aFF2VlFnNWFOdERTbnpOdHpheUJzZTNMSjdxZkphcjhWakIrSzJITlBtOEJvZDJRPT0'
   },
   onProxyReq: (proxyReq, req, res) => {
-    // Add US proxy headers
-    proxyReq.setHeader('X-Forwarded-For', '23.95.150.145');
-    proxyReq.setHeader('X-Real-IP', '23.95.150.145');
+    // Add headers to simulate US origin
+    proxyReq.setHeader('X-Forwarded-For', '72.14.192.0'); // Example US IP range
+    proxyReq.setHeader('X-Real-IP', '72.14.192.0');
     proxyReq.setHeader('Via', '1.1 us-proxy-server');
     
     console.log(`Proxying request to: ${proxyReq.path}`);
@@ -70,22 +65,37 @@ const proxyOptions = {
   },
   onProxyRes: (proxyRes, req, res) => {
     console.log(`Received response: ${proxyRes.statusCode} ${req.path}`);
+    
+    // Add CORS headers for web access
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   },
-  logLevel: 'silent', // Reduce noise by silencing default logs
+  logLevel: 'silent',
   timeout: 30000
 };
 
 // Main proxy endpoint
 app.use('/proxy', createProxyMiddleware(proxyOptions));
 
-// Direct stream endpoints
+// Direct stream endpoint with proper handling
 app.get('/stream', (req, res) => {
+  // Set proper headers for HLS stream
+  res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  
+  // Redirect through our proxy
   res.redirect('/proxy/master.m3u8');
 });
 
 app.get('/master.m3u8', (req, res) => {
-  const proxyUrl = `${req.protocol}://${req.get('host')}/proxy/master.m3u8`;
-  res.redirect(proxyUrl);
+  res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.redirect('/proxy/master.m3u8');
+});
+
+// Simple direct proxy endpoint (alternative)
+app.get('/direct', (req, res) => {
+  res.redirect('https://laaaaaaaal.dupereasy.com/slh/Y29NR1RBV1JTSGc2RGwxN0dZTUdjL1VxdnYwWUVaNjAxME0vRWtCU1E5aFF2VlFnNWFOdERTbnpOdHpheUJzZTNMSjdxZkphcjhWakIrSzJITlBtOEJvZDJRPT0/master.m3u8');
 });
 
 // Error handling middleware
@@ -106,6 +116,7 @@ app.use((req, res) => {
       '/ip-check',
       '/stream',
       '/master.m3u8',
+      '/direct',
       '/proxy/*'
     ]
   });
@@ -117,5 +128,6 @@ app.listen(PORT, () => {
   console.log(`Health: http://localhost:${PORT}/health`);
   console.log(`IP Check: http://localhost:${PORT}/ip-check`);
   console.log(`Stream: http://localhost:${PORT}/stream`);
+  console.log(`Direct: http://localhost:${PORT}/direct`);
   console.log(`================================`);
 });
