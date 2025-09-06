@@ -1,14 +1,15 @@
 {
-  "name": "iptv-proxy",
+  "name": "us-proxy-server",
   "version": "1.0.0",
+  "description": "US Proxy Server for streaming",
   "main": "server.js",
-  "type": "module",
-  "dependencies": {
-    "express": "^4.18.2",
-    "node-fetch": "^3.3.2",
-    "https-proxy-agent": "^7.0.2"
-  },
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
+    "cors": "^2.8.5",
+    "axios": "^1.4.0"
   }
 }
